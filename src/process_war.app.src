@@ -1,8 +1,8 @@
-{application, process-war,
+{application, process_war,
  [{description, "An OTP application"},
   {vsn, "0.1.0"},
   {registered, []},
-  {mod, {process-war_app, []}},
+  {mod, {process_war_app, []}},
   {applications,
    [kernel,
     stdlib

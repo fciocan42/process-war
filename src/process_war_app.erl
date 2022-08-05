@@ -1,16 +1,16 @@
 %%%-------------------------------------------------------------------
-%% @doc process-war public API
+%% @doc process_war public API
 %% @end
 %%%-------------------------------------------------------------------
 
--module(process-war_app).
+-module(process_war_app).
 
 -behaviour(application).
 
 -export([start/2, stop/1]).
 
 start(_StartType, _StartArgs) ->
-    process-war_sup:start_link().
+    process_war_sup:start_link().
 
 stop(_State) ->
     ok.

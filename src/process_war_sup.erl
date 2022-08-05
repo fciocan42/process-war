@@ -1,9 +1,9 @@
 %%%-------------------------------------------------------------------
-%% @doc process-war top level supervisor.
+%% @doc process_war top level supervisor.
 %% @end
 %%%-------------------------------------------------------------------
 
--module(process-war_sup).
+-module(process_war_sup).
 
 -behaviour(supervisor).
 
