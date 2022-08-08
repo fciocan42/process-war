@@ -1,7 +1,7 @@
 process_war
 =====
 
-An OTP application
+An OTP program
 
 Build
 -----
