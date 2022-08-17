@@ -11,6 +11,7 @@
 %-record(process, {pid, name, coords :: coord}).
 -record(war_map, {dim_n = 10, dim_m = 10, process_map :: #{term() => coord}, reward_list = [#coord{x=10, y=10}]:: [coord]}).
 
+% fciocan branch
 start_link() ->
    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
