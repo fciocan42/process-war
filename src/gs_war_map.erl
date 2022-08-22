@@ -64,10 +64,17 @@ handle_call({add_pid, X, Y}, From, State) ->
    Reply = {ok, NewState},
    {reply, Reply, NewState};
 
-% Move Right
+% Move PID
 handle_call({move, Direction}, From, State) ->
-   NewState = move_pid(Direction, From, State),
-   Reply = {ok, NewState},
+   {NewState, Reply} = case move_pid(Direction, From, State) of
+      {ok, NewCoord} ->
+         {Pid, _} = From,
+         ProcessMap = State#war_map.process_map,
+         NewProcessMap = ProcessMap#{Pid => NewCoord},
+         {State#war_map{process_map = NewProcessMap}, moved};
+      {error, ErrorMsg} ->
+         {State, {error, ErrorMsg}}
+   end,
    {reply, Reply, NewState}.
 
 handle_info(Msg, State) ->
@@ -92,19 +99,15 @@ move_pid(Direction, From, State) ->
    ProcessMap = State#war_map.process_map,
    OldCoord = maps:get(Pid, ProcessMap),
    % ? NewCoord = OldCoord#coord{x = OldCoord#coord.x + 1},
-   % {ok, NewCoord} = case Direction of
-   NewCoord = case Direction of
+   case Direction of
       right ->
-         #coord{x = OldCoord#coord.x + 1, y = OldCoord#coord.y};
+         {ok, #coord{x = OldCoord#coord.x + 1, y = OldCoord#coord.y}};
       left -> 
-         #coord{x = OldCoord#coord.x - 1, y = OldCoord#coord.y};
+         {ok, #coord{x = OldCoord#coord.x - 1, y = OldCoord#coord.y}};
       down -> 
-         #coord{x = OldCoord#coord.x, y = OldCoord#coord.y + 1};
+         {ok, #coord{x = OldCoord#coord.x, y = OldCoord#coord.y + 1}};
       up -> 
-         #coord{x = OldCoord#coord.x, y = OldCoord#coord.y - 1};
+         {ok, #coord{x = OldCoord#coord.x, y = OldCoord#coord.y - 1}};
       _ ->
          {error, "Invalid direction!"}
-   end,
-   NewProcessMap = ProcessMap#{Pid => NewCoord},
-   State#war_map{process_map = NewProcessMap}.
-   % ?before NewState = State#war_map{process_map = #{Pid => NewCoord}},
+   end.
