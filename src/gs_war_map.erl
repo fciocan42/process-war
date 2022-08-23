@@ -83,25 +83,7 @@ handle_call({move, Direction}, From, State) ->
 
 % Available steps
 handle_call(available_steps, From, State) ->
-   % Right, Left, Down, Up
-   Directions = [{1, 0}, {-1, 0}, {0, 1}, {0, -1}],
-   {Pid, _} = From,
-   ProcessMap = State#war_map.process_map,
-   Coord = maps:get(Pid, ProcessMap),
-   Reply = lists:map(
-      fun({X, Y}) ->
-         NewX = Coord#coord.x + X,
-         NewY = Coord#coord.y + Y,
-         CoordState = case is_out(NewX, NewY, State) of
-            true -> out;
-            false ->
-               case is_reward(NewX, NewY, State) of
-                  true -> reward;
-                  false -> empty
-               end
-         end,
-         {{NewX, NewY}, CoordState}
-      end, Directions),
+   Reply =  {ok, steps_state(From, State)},
    {reply, Reply, State}.
 
 handle_info(Msg, State) ->
@@ -148,3 +130,25 @@ is_reward(X, Y, State) ->
       {value, _} -> true;
       false -> false
    end.
+
+steps_state(From, State) ->
+   % Right, Left, Down, Up
+   Directions = [{1, 0}, {-1, 0}, {0, 1}, {0, -1}],
+   {Pid, _} = From,
+   ProcessMap = State#war_map.process_map,
+   Coord = maps:get(Pid, ProcessMap),
+   lists:map(
+      fun({X, Y}) ->
+         NewX = Coord#coord.x + X,
+         NewY = Coord#coord.y + Y,
+         CoordState = case is_out(NewX, NewY, State) of
+            true -> out;
+            false ->
+               case is_reward(NewX, NewY, State) of
+                  true -> reward;
+                  false -> empty
+               end
+         end,
+         {{NewX, NewY}, CoordState}
+      end
+   , Directions). 
