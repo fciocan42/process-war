@@ -149,6 +149,6 @@ steps_state(From, State) ->
                   false -> empty
                end
          end,
-         {{NewX, NewY}, CoordState}
+         {{X, Y}, CoordState}
       end
    , Directions). 
