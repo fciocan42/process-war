@@ -16,7 +16,8 @@ start_link() ->
    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 get_dimensions()->
-   gen_server:call(?MODULE, get_dimensions).
+   {ok, Dimensions} = gen_server:call(?MODULE, get_dimensions),
+   Dimensions.
 
 get_coord()->
    gen_server:call(?MODULE, get_coord).
@@ -151,4 +152,4 @@ steps_state(From, State) ->
          end,
          {{X, Y}, CoordState}
       end
-   , Directions). 
+   , Directions).
