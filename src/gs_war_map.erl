@@ -76,7 +76,7 @@ handle_call({move, Direction}, From, State) ->
          {Pid, _} = From,
          ProcessMap = State#war_map.process_map,
          NewProcessMap = ProcessMap#{Pid => NewCoord},
-         {State#war_map{process_map = NewProcessMap}, moved};
+         {State#war_map{process_map = NewProcessMap}, {moved, NewCoord}};
       {error, ErrorMsg} ->
          {State, {error, ErrorMsg}}
    end,
