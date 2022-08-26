@@ -27,14 +27,9 @@ add_pid()->
 add_pid(X, Y)->
    gen_server:call(?MODULE, {add_pid, X, Y}).
 
-move_right()->
-   gen_server:call(?MODULE, {move, right}).
-move_left()->
-   gen_server:call(?MODULE, {move, left}).
-move_up()->
-   gen_server:call(?MODULE, {move, up}).
-move_down()->
-   gen_server:call(?MODULE, {move, down}).
+
+move(Direction)->
+   gen_server:call(?MODULE, {move, Direction}).
 
 available_steps()->
    gen_server:call(?MODULE, available_steps).
@@ -159,12 +154,12 @@ is_reward(X, Y, State) ->
 
 steps_state(From, State) ->
    % Right, Left, Down, Up
-   Directions = [{1, 0} => right, {-1, 0}, {0, 1}, {0, -1}],
+   Directions = [{{1, 0},right}, {{-1, 0},left}, {{0, 1},down}, {{0, -1},up}],
    {Pid, _} = From,
    ProcessMap = State#war_map.process_map,
    Coord = maps:get(Pid, ProcessMap),
    lists:map(
-      fun({X, Y} =: Direction) ->
+      fun({{X, Y}, Direction}) ->
          NewX = Coord#coord.x + X,
          NewY = Coord#coord.y + Y,
          CoordState = case is_out(NewX, NewY, State) of
@@ -175,6 +170,6 @@ steps_state(From, State) ->
                   false -> empty
                end
          end,
-         {Direction, CoordState}
+         {Direction, CoordState, {NewX, NewY}}
       end
    , Directions).
