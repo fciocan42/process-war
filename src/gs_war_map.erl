@@ -159,12 +159,12 @@ is_reward(X, Y, State) ->
 
 steps_state(From, State) ->
    % Right, Left, Down, Up
-   Directions = [{1, 0}, {-1, 0}, {0, 1}, {0, -1}],
+   Directions = [{1, 0} => right, {-1, 0}, {0, 1}, {0, -1}],
    {Pid, _} = From,
    ProcessMap = State#war_map.process_map,
    Coord = maps:get(Pid, ProcessMap),
    lists:map(
-      fun({X, Y}) ->
+      fun({X, Y} =: Direction) ->
          NewX = Coord#coord.x + X,
          NewY = Coord#coord.y + Y,
          CoordState = case is_out(NewX, NewY, State) of
@@ -175,6 +175,6 @@ steps_state(From, State) ->
                   false -> empty
                end
          end,
-         {{X, Y}, CoordState}
+         {Direction, CoordState}
       end
    , Directions).
