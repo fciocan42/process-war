@@ -25,4 +25,14 @@ init(_Args) ->
         points = 0
     }}.
 
+available_steps()->
+    lisis:filter(fun({_, State}) -> State =/= out end, gs_war_map:available_steps()).
+
+compute_next_move()->
+   Steps = available_steps(),
+   ListSize = lists:length(Steps),
+   {Coords, State} = lists:nth(rand:uniform(ListSize), Steps),
+
+
+
 
