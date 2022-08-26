@@ -14,29 +14,31 @@
     current_move :: atom(),
     previous_move :: atom(),
     points :: integer(),
-    status :: status()
+    status :: status(),
+    name :: atom()
 }).
 
 start_link(Name) ->
-    gen_server:start_link(Name, {local, ?MODULE}, ?MODULE, [], []).
+    gen_server:start_link(Name, {local, ?MODULE}, ?MODULE, [Name], []).
 
-init(_Args) ->
+init([Name]) ->
     {ok, #state{
         current_position = #coord{x = 0, y = 0},
         current_move = none,
         previous_move = none,
         points = 0,
-        status = ready
+        status = ready,
+        name = Name 
     }}.
 
-start()->
-    case gen_server:call(?MODULE, exploring) of
+start(Name)->
+    case gen_server:call(Name, exploring) of
         {ok, exploring} -> start();
         {ok, paused} -> ok
     end.
 
-pause()->
-    gen_server:call(?MODULE, pause).
+pause(Name)->
+    gen_server:call(Name, pause).
 
 handle_call(pause, From, State) ->
     NewState = State#state{status=paused},
@@ -53,6 +55,9 @@ handle_call(exploring, From, State = #state{status=exploring}) ->
 
 handle_call(exploring, From, State)->
     {reply, {ok, exploring, "Already exploring!"}, State}.
+
+handle_call(neighbors, From, State)->
+    gen_server:call(gs_war_map,neighbors).
 
 
 exploring(State) ->
@@ -76,3 +81,6 @@ compute_next_move()->
    Steps = available_steps(),
    ListSize = lists:length(Steps),
    lists:nth(rand:uniform(ListSize), Steps).
+
+get_neighbors()->
+    gen_server:call(gs_war_map, neighbors).
