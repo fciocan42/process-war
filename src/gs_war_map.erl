@@ -46,8 +46,28 @@ stop() ->
 init(_Args) ->
    {ok, #war_map{process_map=#{}}}.
 
-% war_map - Getters
-% TODO
+
+get_name()->
+   gen_server:call(?MODULE, get_name).
+
+
+ 
+display_map(State, xc, yc) when xc == coord.x && yc == coord.y && yc < dim_m -> 
+   io:format("*"),
+   display(State, xc, yc+1).
+display_map(State, xc, yc) when xc == coord.x && yc == coord.y && yc == dim_m ->
+   io:format("*"),
+   display(State, xc+1, 0).
+display_map(State, xc, yc) when yc < dim_m -> 
+   io:format("."),
+   display(State, xc, yc+1).
+display_map(State, xc, yc) when yc == dim_m -> 
+   io:format("."),
+   display(State, xc+1, 0).
+
+
+
+
 
 % Get dimensions
 handle_call(get_dimensions, _From, State) ->
@@ -60,6 +80,11 @@ handle_call(get_coord, From, State) ->
             Coord -> {ok, {Coord#coord.x, Coord#coord.y}};
             _ -> {badkey, "Out of game"}
    end,
+   {reply, Reply, State};
+
+%Get name
+handle_call(get_name, From, State) ->
+   Reply = {ok, State#process.name},
    {reply, Reply, State};
 
 % Add PID
