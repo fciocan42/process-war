@@ -7,7 +7,7 @@
 
 -include("records.hrl").
 
--type status() :: ready | exploring.
+-type status() :: ready | exploring | paused.
 
 -record(state, {
     current_position :: coord,
@@ -29,19 +29,33 @@ init(_Args) ->
         status = ready
     }}.
 
-move()
+start()->
+    case gen_server:call(?MODULE, exploring) of
+        {ok, exploring} -> start();
+        {ok, paused} -> ok
+    end.
 
-handle_call(move, From, State) ->
+pause()->
+    gen_server:call(?MODULE, pause).
+
+handle_call(pause, From, State) ->
+    NewState = State#state{status=paused},
+    {reply, {ok, NewState}, NewState};
 
 
-handle_call(start, From, State) ->
-    start_exploring(State),
-    gen_server:call(?MODULE, )
+handle_call(exploring, From, State = #state{status=paused}) ->
+    {reply, {ok, paused}, State};
+
+handle_call(exploring, From, State = #state{status=exploring}) ->
+    exploring(State),
+    Reply = {ok, exploring},
+    {reply, Reply, State};
+
+handle_call(exploring, From, State)->
+    {reply, {ok, exploring, "Already exploring!"}, State}.
 
 
-
-
-start_exploring(State) ->
+exploring(State) ->
     {Direction, CellState, Coords} = compute_next_move(),
     case gs_war_map:move(Direction) of
         {ok, moved} ->
