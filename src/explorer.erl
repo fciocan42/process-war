@@ -7,11 +7,14 @@
 
 -include("records.hrl").
 
+-type status() :: ready | exploring.
+
 -record(state, {
     current_position :: coord,
     current_move :: atom(),
     previous_move :: atom(),
-    points :: integer()
+    points :: integer(),
+    status :: status()
 }).
 
 start_link(Name) ->
@@ -22,19 +25,40 @@ init(_Args) ->
         current_position = #coord{x = 0, y = 0},
         current_move = none,
         previous_move = none,
-        points = 0
+        points = 0,
+        status = ready
     }}.
 
-available_steps()->
-    lisis:filter(fun({_, State}) -> State =/= out end, gs_war_map:available_steps()).
+move()
+
+handle_call(move, From, State) ->
+
+
+handle_call(start, From, State) ->
+    start_exploring(State),
+    gen_server:call(?MODULE, )
+
+
+
+
+start_exploring(State) ->
+    {Direction, CellState, Coords} = compute_next_move(),
+    case gs_war_map:move(Direction) of
+        {ok, moved} ->
+            update_state(State, Direction, Coords),
+            start_exploring();
+        {error, Msg} -> {error, Msg}
+    end.
+
+update_state() ->
+
+available_steps() ->
+    lisis:filter(
+        fun({_Direction, CellState, _Coords}) -> CellState =/= out end, gs_war_map:available_steps()
+    ).
+
 
 compute_next_move()->
    Steps = available_steps(),
    ListSize = lists:length(Steps),
-   {Coords, State} = lists:nth(rand:uniform(ListSize), Steps),
-
-
-
-
-
-
+   lists:nth(rand:uniform(ListSize), Steps).

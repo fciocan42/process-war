@@ -46,17 +46,17 @@ get_name()->
    gen_server:call(?MODULE, get_name).
 
 
- 
-display_map(State, xc, yc) when xc == coord.x && yc == coord.y && yc < dim_m -> 
+
+display_map(State, xc, yc) when xc == coord.x && yc == coord.y && yc < dim_m ->
    io:format("*"),
    display(State, xc, yc+1).
 display_map(State, xc, yc) when xc == coord.x && yc == coord.y && yc == dim_m ->
    io:format("*"),
    display(State, xc+1, 0).
-display_map(State, xc, yc) when yc < dim_m -> 
+display_map(State, xc, yc) when yc < dim_m ->
    io:format("."),
    display(State, xc, yc+1).
-display_map(State, xc, yc) when yc == dim_m -> 
+display_map(State, xc, yc) when yc == dim_m ->
    io:format("."),
    display(State, xc+1, 0).
 
@@ -96,7 +96,7 @@ handle_call({move, Direction}, From, State) ->
          {Pid, _} = From,
          ProcessMap = State#war_map.process_map,
          NewProcessMap = ProcessMap#{Pid => NewCoord},
-         {State#war_map{process_map = NewProcessMap}, moved};
+         {State#war_map{process_map = NewProcessMap}, {ok, moved}};
       {error, ErrorMsg} ->
          {State, {error, ErrorMsg}}
    end,
@@ -132,11 +132,11 @@ move_pid(Direction, From, State) ->
    case Direction of
       right ->
          {ok, #coord{x = OldCoord#coord.x + 1, y = OldCoord#coord.y}};
-      left -> 
+      left ->
          {ok, #coord{x = OldCoord#coord.x - 1, y = OldCoord#coord.y}};
-      down -> 
+      down ->
          {ok, #coord{x = OldCoord#coord.x, y = OldCoord#coord.y + 1}};
-      up -> 
+      up ->
          {ok, #coord{x = OldCoord#coord.x, y = OldCoord#coord.y - 1}};
       _ ->
          {error, "Invalid direction!"}
