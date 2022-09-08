@@ -71,7 +71,7 @@ handle_call(exploring, From, State = #state{status=exploring}) ->
     {reply, Reply, State};
 
 handle_call(exploring, From, State)->
-    {reply, {ok, exploring, "Already exploring!"}, State}.
+    {reply, {ok, exploring, "Already exploring!"}, State};
 
 handle_info(Msg, State) ->
     io:format("Unexpected message: ~p~n",[Msg]),
@@ -106,5 +106,5 @@ compute_next_move()->
    ListSize = lists:length(Steps),
    lists:nth(rand:uniform(ListSize), Steps).
 
-get_neighbors()->
-    gen_server:call(gs_war_map, neighbors).
+get_neighbours()->
+    gen_server:call(gs_war_map, neighbours).
