@@ -62,10 +62,10 @@ handle_call(ready, _From, State) ->
     NewState = State#state{status = ready},
     {reply, {ok, NewState}, NewState};
 
-handle_call(exploring, From, State = #state{status = ready}) ->
+handle_call(exploring, _From, State = #state{status = ready}) ->
     {reply, {ok, exploring}, State#state{status = exploring}};
 
-handle_call(exploring, From, State = #state{status=paused}) ->
+handle_call(exploring, _From, State = #state{status=paused}) ->
     {reply, {ok, paused}, State};
 
 handle_call(exploring, _From, State = #state{status = exploring}) ->
