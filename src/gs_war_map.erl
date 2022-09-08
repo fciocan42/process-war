@@ -49,7 +49,7 @@ get_name()->
    gen_server:call(?MODULE, get_name).
 
 
-% DiapLy map
+% Display map
 
 display_map(State, xc, yc) when xc == coord.x && yc == coord.y && yc < dim_m ->
    io:format("*"),
@@ -96,9 +96,19 @@ handle_call(get_name, From, State) ->
 handle_call({add_pid, X, Y}, From, State) ->
    %  if I return the state the Process will have all info about map
    {Pid, _} = From,
-   NewState = State#war_map{process_map = #{Pid => #coord{x = X, y = Y}}},
-   Reply = {ok, NewState},
-   {reply, Reply, NewState};
+   {Reply, ReplyState} = case maps:is_key(Pid, State#war_map.process_map) of
+      false ->
+         case is_out(X, Y, State) of
+            false ->
+               NewState = State#war_map{process_map = #{Pid => #coord{x = X, y = Y}}},
+               {{ok, "Warrior added!"}, NewState};
+            true  ->
+               {{error, "Invalid coordinates!"}, State}
+         end;
+      true ->
+         {{error, "Already added!"}, State}
+   end,
+   {reply, Reply, ReplyState};
 
 handle_call(neighbours, _From, State) ->
    maps:keys(State#war_map.process_map);
