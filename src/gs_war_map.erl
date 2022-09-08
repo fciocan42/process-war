@@ -3,8 +3,8 @@
 
 -export([start_link/0, stop/0]).
 -export([init/1, handle_call/3, handle_info/2, terminate/2]).
--export([get_dimensions/0, get_coord/0, add_pid/0, add_pid/2]).
--export([move_right/0, move_left/0, move_up/0, move_down/0]).
+-export([get_dimensions/0, get_proccess_list/0, get_coord/0, add_pid/0, add_pid/2]).
+-export([move/1]).
 -export([available_steps/0]).
 
 % -type coord() :: {integer(), integer()}.
@@ -21,6 +21,9 @@ get_dimensions()->
 
 get_coord()->
    gen_server:call(?MODULE, get_coord).
+
+get_proccess_list()->
+   gen_server:call(?MODULE, get_proccess_list).
 
 add_pid()->
    gen_server:call(?MODULE, {add_pid, 0, 0}).
@@ -46,6 +49,7 @@ get_name()->
    gen_server:call(?MODULE, get_name).
 
 
+% DiapLy map
 
 display_map(State, xc, yc) when xc == coord.x && yc == coord.y && yc < dim_m ->
    io:format("*"),
@@ -61,7 +65,7 @@ display_map(State, xc, yc) when yc == dim_m ->
    display(State, xc+1, 0).
 
 
-
+%%% Getters %%%
 
 
 % Get dimensions
@@ -77,6 +81,12 @@ handle_call(get_coord, From, State) ->
    end,
    {reply, Reply, State};
 
+% Get all processes
+handle_call(get_process_list, _From, State) ->
+   ProcessList = maps:keys(State#war_map.process_map),
+   Reply = {ok, ProcessList},
+   {reply, Reply, State};
+
 %Get name
 handle_call(get_name, From, State) ->
    Reply = {ok, State#process.name},
@@ -84,6 +94,7 @@ handle_call(get_name, From, State) ->
 
 % Add PID
 handle_call({add_pid, X, Y}, From, State) ->
+   %  if I return the state the Process will have all info about map
    {Pid, _} = From,
    NewState = State#war_map{process_map = #{Pid => #coord{x = X, y = Y}}},
    Reply = {ok, NewState},
