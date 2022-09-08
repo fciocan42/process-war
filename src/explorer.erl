@@ -75,9 +75,6 @@ handle_call(exploring, _From, State = #state{status = exploring}) ->
     end,
     {reply, Reply, ReplyState}.
 
-handle_call(exploring, From, State)->
-    {reply, {ok, exploring, "Already exploring!"}, State}.
-
 handle_info(Msg, State) ->
     io:format("Unexpected message: ~p~n",[Msg]),
     {noreply, State}.
