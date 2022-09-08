@@ -49,7 +49,7 @@ get_name()->
    gen_server:call(?MODULE, get_name).
 
 
-% DiapLy map
+% Display map
 
 display_map(State, xc, yc) when xc == coord.x && yc == coord.y && yc < dim_m ->
    io:format("*"),
@@ -62,7 +62,7 @@ display_map(State, xc, yc) when yc < dim_m ->
    display(State, xc, yc+1).
 display_map(State, xc, yc) when yc == dim_m ->
    io:format("."),
-   display(State, xc+1, 0).
+display(State, xc+1, 0).
 
 
 %%% Getters %%%
@@ -100,8 +100,8 @@ handle_call({add_pid, X, Y}, From, State) ->
    Reply = {ok, NewState},
    {reply, Reply, NewState};
 
-handle_call(neighbors, From, State) ->
-   maps:keys(State#war_map.process_map).
+handle_call(neighbours, From, State) ->
+   maps:keys(State#war_map.process_map);
 
 % Move PID
 handle_call({move, Direction}, From, State) ->
