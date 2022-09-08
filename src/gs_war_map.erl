@@ -100,6 +100,9 @@ handle_call({add_pid, X, Y}, From, State) ->
    Reply = {ok, NewState},
    {reply, Reply, NewState};
 
+handle_call(neighbors, From, State) ->
+   maps:keys(State#war_map.process_map).
+
 % Move PID
 handle_call({move, Direction}, From, State) ->
    {NewState, Reply} = case move_pid(Direction, From, State) of
