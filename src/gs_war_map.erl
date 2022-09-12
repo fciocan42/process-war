@@ -10,7 +10,7 @@
 % -type coord() :: {integer(), integer()}.
 -record(coord, {x :: integer(), y :: integer()}).
 %-record(process, {pid, name, coords :: coord}).
--record(war_map, {dim_n = 10, dim_m = 10, process_map :: #{term() => coord}, reward_list = [#coord{x=9, y=9}]:: [coord]}).
+-record(war_map, {dim_n = 10, dim_m = 10, process_map :: #{term() => coord}, reward_map = #{#coord{x=9, y=9} => 3}:: #{coord => term()}}).
 
 start_link() ->
    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -62,7 +62,7 @@ display_map(State, xc, yc) when yc < dim_m ->
    display(State, xc, yc+1).
 display_map(State, xc, yc) when yc == dim_m ->
    io:format("."),
-   display(State, xc+1, 0).
+display(State, xc+1, 0).
 
 
 %%% Getters %%%
@@ -129,7 +129,20 @@ handle_call({move, Direction}, From, State) ->
 % Available steps
 handle_call(available_steps, From, State) ->
    Reply =  {ok, steps_state(From, State)},
-   {reply, Reply, State}.
+   {reply, Reply, State};
+
+% TODO cast
+handle_call({earn_reward, {X, Y}}, _From, State) ->
+   {Points, ReplyState} = case is_reward(X, Y, State) of
+      true  ->
+         % TODO get the amount from reward_map
+         RewardAmount = maps:get(#coord{x = X, y = Y}, State#war_map.reward_map, -1),
+         NewState = State#war_map{reward_map = #{#coord{x = X, y =  Y} => RewardAmount - 1}},
+         {1, NewState};
+      false ->
+         {0,  State}
+   end,
+   {reply, {ok, Points}, ReplyState}.
 
 handle_info(Msg, State) ->
    io:format("Unexpected message: ~p~n",[Msg]),
@@ -171,7 +184,7 @@ is_out(X, Y, State) ->
 
 is_reward(X, Y, State) ->
    _GivenCoord = #coord{x = X, y = Y},
-   case lists:search(fun(Reward) -> Reward == #coord{x = X, y = Y} end, State#war_map.reward_list) of
+   case lists:search(fun(Reward) -> Reward == #coord{x = X, y = Y} end, maps:keys(State#war_map.reward_map)) of
       {value, _} -> true;
       false -> false
    end.
