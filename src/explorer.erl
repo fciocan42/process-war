@@ -3,7 +3,7 @@
 -behaviour(gen_server).
 
 -export([start_link/1, stop/0]).
--export([init/1, handle_call/3, handle_info/2, terminate/2]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 -export([start/1, pause/1, ready/1, get_neighbours/0]).
 
 -include("records.hrl").
@@ -20,7 +20,7 @@
 }).
 
 start_link(Name) ->
-    gen_server:start_link(Name, {local, ?MODULE}, ?MODULE, [Name], []).
+    gen_server:start_link({local, Name}, ?MODULE, [Name], []).
 
 init([Name]) ->
     init([Name, {0, 0}]);
@@ -81,6 +81,9 @@ handle_call(exploring, _From, State = #state{status = exploring}) ->
         {error, _Msg} -> {{ok, paused}, State#state{status = paused}}
     end,
     {reply, Reply, ReplyState}.
+
+handle_cast(noop, State) ->
+    {noreply, State}.
 
 handle_info(Msg, State) ->
     io:format("Unexpected message: ~p~n",[Msg]),

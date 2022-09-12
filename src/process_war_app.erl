@@ -11,6 +11,7 @@
 
 start(_StartType, _StartArgs) ->
     process_war_sup:start_link(),
+    war_map_sup:start_link(),
     explorer_sup:start_link().
 
 stop(_State) ->
