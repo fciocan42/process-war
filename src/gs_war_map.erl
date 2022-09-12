@@ -111,7 +111,7 @@ handle_call({add_pid, X, Y}, From, State) ->
         end,
     {reply, Reply, ReplyState};
 handle_call(neighbours, _From, State) ->
-    maps:keys(State#war_map.process_map);
+    {reply, {ok, maps:keys(State#war_map.process_map)}, State};
 % Move PID
 handle_call({move, Direction}, From, State) ->
     {NewState, Reply} =
