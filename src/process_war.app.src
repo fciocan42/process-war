@@ -2,7 +2,7 @@
  [{description, "An OTP application"},
   {vsn, "0.1.0"},
   {registered, []},
-  {mod, {process_war_app, []}},
+  {mod, {process_war_app, [#{explorer_num => 10}]}},
   {applications,
    [kernel,
     stdlib
