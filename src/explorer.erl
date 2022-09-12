@@ -23,14 +23,21 @@ start_link(Name) ->
     gen_server:start_link(Name, {local, ?MODULE}, ?MODULE, [Name], []).
 
 init([Name]) ->
-    {ok, #state{
-        current_position = #coord{x = 0, y = 0},
-        current_move = none,
-        previous_move = none,
-        points = 0,
-        status = ready,
-        name = Name 
-    }}.
+    init([Name, {0, 0}]);
+init([Name, {X, Y}]) ->
+    case gs_war_map:add_pid(X, Y) of
+        {ok, _} ->
+            {ok, #state{
+                current_position = #coord{x = X, y = Y},
+                current_move = none,
+                previous_move = none,
+                points = 0,
+                status = ready,
+                name = Name
+            }};
+        {error, Msg} ->
+            {stop,  Msg}
+    end.
 
 start(Name)->
     case gen_server:call(Name, exploring) of
@@ -71,7 +78,7 @@ handle_call(exploring, From, State = #state{status=exploring}) ->
     {reply, Reply, State};
 
 handle_call(exploring, From, State)->
-    {reply, {ok, exploring, "Already exploring!"}, State}.
+    {reply, {ok, exploring, "Already exploring!"}, State};
 
 handle_info(Msg, State) ->
     io:format("Unexpected message: ~p~n",[Msg]),
@@ -106,5 +113,5 @@ compute_next_move()->
    ListSize = lists:length(Steps),
    lists:nth(rand:uniform(ListSize), Steps).
 
-get_neighbors()->
-    gen_server:call(gs_war_map, neighbors).
+get_neighbours()->
+    gen_server:call(gs_war_map, neighbours).
