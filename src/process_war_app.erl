@@ -10,9 +10,7 @@
 -export([start/2, stop/1]).
 
 start(_StartType, [#{explorer_num := ExpNum}]) ->
-    process_war_sup:start_link(),
-    war_map_sup:start_link(),
-    explorer_sup:start_link(ExpNum).
+    process_war_sup:start_link(ExpNum).
 
 stop(_State) ->
     ok.

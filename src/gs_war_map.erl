@@ -128,20 +128,19 @@ handle_call({move, Direction}, From, State) ->
 % Available steps
 handle_call(available_steps, From, State) ->
     Reply = {ok, steps_state(From, State)},
-    {reply, Reply, State};
+    {reply, Reply, State}.
 % TODO cast
-handle_call({earn_reward, {X, Y}}, _From, State) ->
+handle_cast({earn_reward, {X, Y}}, State) ->
     {Points, ReplyState} =
         case is_reward(X, Y, State) of
             true ->
-                % TODO get the amount from reward_map
-                RewardAmount = maps:get(#coord{x = X, y = Y}, State#war_map.reward_map, -1),
+                RewardAmount = maps:get(#coord{x = X, y = Y}, State#war_map.reward_map),
                 NewState = State#war_map{reward_map = #{#coord{x = X, y = Y} => RewardAmount - 1}},
                 {1, NewState};
             false ->
                 {0, State}
         end,
-    {reply, {ok, Points}, ReplyState}.
+    {reply, {ok, Points}, ReplyState};
 
 handle_cast(noop, State) ->
     {noreply, State}.
@@ -190,7 +189,10 @@ is_reward(X, Y, State) ->
                       maps:keys(State#war_map.reward_map))
     of
         {value, _} ->
-            true;
+            case value of
+               0 -> false;
+               _ -> true
+            end;
         false ->
             false
     end.
