@@ -101,7 +101,9 @@ handle_call({add_pid, X, Y}, From, State) ->
             false ->
                 case is_out(X, Y, State) of
                     false ->
-                        NewState = State#war_map{process_map = #{Pid => #coord{x = X, y = Y}}},
+                        ProcessMap = State#war_map.process_map,
+                        NewProcessMap = ProcessMap#{Pid => #coord{x = X, y = Y}},
+                        NewState = State#war_map{process_map = NewProcessMap},
                         {{ok, "Warrior added!"}, NewState};
                     true ->
                         {{error, "Invalid coordinates!"}, State}
@@ -128,21 +130,19 @@ handle_call({move, Direction}, From, State) ->
 % Available steps
 handle_call(available_steps, From, State) ->
     Reply = {ok, steps_state(From, State)},
-    {reply, Reply, State};
-% TODO cast
-handle_call({earn_reward, {X, Y}}, _From, State) ->
+    {reply, Reply, State}.
+
+handle_cast({earn_reward, {X, Y}}, State) ->
     {Points, ReplyState} =
         case is_reward(X, Y, State) of
             true ->
-                % TODO get the amount from reward_map
-                RewardAmount = maps:get(#coord{x = X, y = Y}, State#war_map.reward_map, -1),
+                RewardAmount = maps:get(#coord{x = X, y = Y}, State#war_map.reward_map),
                 NewState = State#war_map{reward_map = #{#coord{x = X, y = Y} => RewardAmount - 1}},
                 {1, NewState};
             false ->
                 {0, State}
         end,
-    {reply, {ok, Points}, ReplyState}.
-
+    {reply, {ok, Points}, ReplyState};
 handle_cast(noop, State) ->
     {noreply, State}.
 
@@ -157,7 +157,9 @@ terminate(Reason, _State) ->
 % Module helper functions
 
 % XoY Axis
-% 0 -- > X
+% 0 -- N -- > X
+% |
+% M
 % |
 % v
 % Y
@@ -190,7 +192,12 @@ is_reward(X, Y, State) ->
                       maps:keys(State#war_map.reward_map))
     of
         {value, _} ->
-            true;
+            case value of
+                0 ->
+                    false;
+                _ ->
+                    true
+            end;
         false ->
             false
     end.
