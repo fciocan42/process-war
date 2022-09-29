@@ -42,6 +42,7 @@ init([Name, {X, Y}]) ->
 start(Name)->
     case gen_server:call(Name, exploring) of
         {ok, exploring} -> start(Name);
+        {ok, targeting} -> targeting(Name);
         {ok, paused} -> paused
     end.
 
@@ -50,6 +51,9 @@ pause(Name)->
 
 ready(Name)->
     gen_server:call(Name, ready).
+
+targeting(Name)->
+    gen_server:call(Name, targeting).
 
 get_neighbours()->
     {ok, Neighbours} = gen_server:call(gs_war_map, neighbours),
@@ -82,7 +86,19 @@ handle_call(exploring, _From, State = #state{status = exploring}) ->
         {ok, NewState, _} ->  {{ok, exploring}, NewState};
         {error, _Msg} -> {{ok, paused}, State#state{status = paused}}
     end,
-    {reply, Reply, ReplyState}.
+    {reply, Reply, ReplyState};
+
+handle_call(exploring, _From, State = #state{status = targeting}) ->
+    {reply, {ok, targeting}, State};
+
+handle_call(targeting, _From, State = #state{status = exploring}) ->
+    % TODO update queue with rewards coord
+    NewState = State#state{status = targeting},
+    {reply, {ok, NewState}, NewState};
+handle_call(targeting, _From, State = #state{status = targeting}) ->
+    % TODO get  coords from queue
+    targeting(X, Y, State),
+    {reply, {ok, NewState}, NewState};
 
 handle_cast(noop, State) ->
     {noreply, State}.
@@ -100,7 +116,7 @@ handle_info(Msg, State) ->
 % TODO Map instead of tuple list for direction
 next_cell_state(NextDirection) ->
     [NextCellState] =
-        lisis:filter(
+        lists:filter(
             fun({Direction, _CellState, _Coords}) -> Direction == NextDirection end, gs_war_map:available_steps()
         ),
     NextCellState.
@@ -108,8 +124,9 @@ next_cell_state(NextDirection) ->
 targeting(X, Y, State) ->
     StateX = State#state.current_position#coord.x,
     StateY = State#state.current_position#coord.y,
-    targeting_horizontal(X, StateX, State),
-    targeting_vertical(Y, StateY, State).
+    {ok, NewStateH} = targeting_horizontal(X, StateX, State),
+    {ok, NewStateV} = targeting_vertical(Y, StateY, NewStateH),
+    NewStateV.
 
 % TODO Clause when it arrives on reward coords and try to earn points
 targeting_horizontal(X, StateX, State) when StateX < X ->
@@ -117,7 +134,10 @@ targeting_horizontal(X, StateX, State) when StateX < X ->
     % move right
     case gs_war_map:move(right) of
         {ok, moved} ->
-            {ok, update_state(State, Direction, CellState, Coords)};
+            % TODO check if it s reward to earn and alert
+            NewState = update_state(State, Direction, CellState, Coords),
+            NewStateX = Coords#coord.x,
+            targeting_horizontal(X, NewStateX, NewState);
         {error, Msg} ->
             {{error, Msg}, State}
     end;
@@ -126,17 +146,26 @@ targeting_horizontal(X, StateX, State) when StateX > X ->
     % move left
     case gs_war_map:move(left) of
         {ok, moved} ->
-            {ok, update_state(State, Direction, CellState, Coords)};
+            % TODO check if it s reward to earn and alert
+            NewState = update_state(State, Direction, CellState, Coords),
+            NewStateX = Coords#coord.x,
+            targeting_horizontal(X, NewStateX, NewState);
         {error, Msg} ->
             {{error, Msg}, State}
-    end.
+    end;
+targeting_horizontal(X, StateX, State) ->
+    {ok, State}.
+
 
 targeting_vertical(Y, StateY, State) when StateY < Y ->
     {Direction, CellState, Coords} = next_cell_state(down),
     % move down
     case gs_war_map:move(down) of
         {ok, moved} ->
-            {ok, update_state(State, Direction, CellState, Coords)};
+            % TODO check if it s reward to earn and alert
+            NewState = update_state(State, Direction, CellState, Coords),
+            NewStateY = Coords#coord.y,
+            targeting_vertical(Y, NewStateY, NewState);
         {error, Msg} ->
             {{error, Msg}, State}
     end;
@@ -145,10 +174,15 @@ targeting_vertical(Y, StateY, State) when StateY > Y ->
     % move up
     case gs_war_map:move(up) of
         {ok, moved} ->
-            {ok, update_state(State, Direction, CellState, Coords)};
+            % TODO check if it s reward to earn and alert
+            NewState = update_state(State, Direction, CellState, Coords),
+            NewStateY = Coords#coord.y,
+            targeting_vertical(Y, NewStateY, NewState);
         {error, Msg} ->
             {{error, Msg}, State}
-    end.
+    end;
+targeting_vertical(Y, StateY, State) ->
+    {ok, State}.
 
 exploring(State) ->
     {Direction, CellState, Coords} = compute_next_move(State),

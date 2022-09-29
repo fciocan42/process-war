@@ -129,8 +129,15 @@ handle_call({move, Direction}, From, State) ->
 handle_call(available_steps, From, State) ->
     Reply = {ok, steps_state(From, State)},
     {reply, Reply, State};
+
+handle_call(reward_alert, From, State) ->
+    ok.
+    % get coords of From PID
+    % check if it's not false alert(check if From coords are valid rewards coords)
+    % send reward coords to the rest of PID
+
 % TODO cast
-handle_call({earn_reward, {X, Y}}, _From, State) ->
+handle_cast({earn_reward, {X, Y}}, State) ->
     {Points, ReplyState} =
         case is_reward(X, Y, State) of
             true ->
@@ -141,7 +148,7 @@ handle_call({earn_reward, {X, Y}}, _From, State) ->
             false ->
                 {0, State}
         end,
-    {reply, {ok, Points}, ReplyState}.
+    {reply, {ok, Points}, ReplyState};
 
 handle_cast(noop, State) ->
     {noreply, State}.
@@ -189,10 +196,9 @@ is_reward(X, Y, State) ->
     case lists:search(fun(Reward) -> Reward == #coord{x = X, y = Y} end,
                       maps:keys(State#war_map.reward_map))
     of
-        {value, _} ->
-            true;
-        false ->
-            false
+        false -> false;
+        {0, _} -> false;
+        {_, _} -> true
     end.
 
 steps_state(From, State) ->
