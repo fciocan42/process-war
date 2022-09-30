@@ -83,7 +83,11 @@ handle_call(exploring, _From, State = #state{status=paused}) ->
 handle_call(exploring, _From, State = #state{status = exploring}) ->
     {Reply, ReplyState} = case exploring(State) of
         % TODO earn or inform about reward depending on game mode
-        {ok, NewState, reward} ->  {{ok, exploring}, NewState};
+        {ok, NewState, reward} ->
+
+            earn_reward(Coords),
+            inform_explorers(Coords),
+            {{ok, exploring}, NewState};
         {ok, NewState, _} ->  {{ok, exploring}, NewState};
         {error, _Msg} -> {{ok, paused}, State#state{status = paused}}
     end,
@@ -209,6 +213,30 @@ exploring(State) ->
         {error, Msg} ->
             {{error, Msg}, State}
     end.
+
+earn_reward(Coords) ->
+    Mode = application:get_env(process_war, collection_mode, earn_single_reward),
+    Points = case Mode of
+        earn_single_reward ->
+            earn_single_reward(Coords);
+        _ ->
+            earn_multiple_rewards(Coords, 0)
+    end,
+    Points.
+
+earn_single_reward(Coords) ->
+    {ok, Point} = gen_server:call(gs_war_map, {earn_reward, Coords}),
+    Point.
+
+earn_multiple_rewards(Coords, Acc) ->
+    MapResp = gen_server:call(gs_war_map, {earn_reward, Coords}),
+    case MapResp of
+        {ok, 0} ->
+            Acc;
+        {ok, Point} ->
+            earn_multiple_rewards(Coords, Acc + Point)
+    end.
+
 
 update_state(State, Direction, _CellState, {X, Y}) ->
     % TODO  Pick reward and add point only if the reward is available

@@ -133,13 +133,11 @@ handle_call(available_steps, From, State) ->
     {reply, Reply, State};
 
 handle_call(reward_alert, From, State) ->
-    ok.
+    ok;
     % get coords of From PID
     % check if it's not false alert(check if From coords are valid rewards coords)
     % send reward coords to the rest of PID
-
-% TODO cast
-handle_cast({earn_reward, {X, Y}}, State) ->
+handle_call({earn_reward, {X, Y}}, _From, State) ->
     {Points, ReplyState} =
         case is_reward(X, Y, State) of
             true ->
@@ -149,8 +147,8 @@ handle_cast({earn_reward, {X, Y}}, State) ->
             false ->
                 {0, State}
         end,
-    {reply, {ok, Points}, ReplyState};
-    
+    {reply, {ok, Points}, ReplyState}.
+
 handle_cast(noop, State) ->
     {noreply, State}.
 

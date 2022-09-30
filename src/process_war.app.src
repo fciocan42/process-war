@@ -7,7 +7,7 @@
    [kernel,
     stdlib
    ]},
-  {env,[]},
+  {env,[{collection_mode, earn_single_reward}]},
   {modules, []},
 
   {licenses, ["Apache-2.0"]},
