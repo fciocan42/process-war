@@ -138,16 +138,23 @@ handle_call(reward_alert, From, State) ->
     % check if it's not false alert(check if From coords are valid rewards coords)
     % send reward coords to the rest of PID
 handle_call({earn_reward, {X, Y}}, _From, State) ->
-    {Points, ReplyState} =
+    {Points, RemRewards, ReplyState} =
         case is_reward(X, Y, State) of
             true ->
                 RewardAmount = maps:get(#coord{x = X, y = Y}, State#war_map.reward_map),
                 NewState = State#war_map{reward_map = #{#coord{x = X, y = Y} => RewardAmount - 1}},
-                {1, NewState};
+                {1, RewardAmount - 1, NewState};
             false ->
-                {0, State}
+                {0, 0, State}
         end,
-    {reply, {ok, Points}, ReplyState}.
+    VisibleRewards = application:get_env(process_war, visible_rewards_no, false),
+    Response = case VisibleRewards of
+        true ->
+            {Points, RemRewards};
+        false ->
+            {Points, ?UNKOWN_REWARDS_NO}
+    end,
+    {reply, {ok, Response}, ReplyState}.
 
 handle_cast(noop, State) ->
     {noreply, State}.

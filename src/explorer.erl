@@ -83,8 +83,8 @@ handle_call(exploring, _From, State = #state{status = exploring}) ->
             % TODO earn or inform about reward depending on game mode
             {ok, NewState, reward} ->
                 Coords = NewState#state.current_position,
-                Points = earn_reward(Coords),
-                inform_explorers(Coords, 1, State#state.neighbours),
+                Neighbours = NewState#state.neighbours,
+                Points = explorer_util:earn_reward_and_inform(Coords, Neighbours),
                 CurrentPoints = NewState#state.points,
                 {{ok, exploring}, NewState#state{points = CurrentPoints + Points}};
             {ok, NewState, _} ->
@@ -125,9 +125,7 @@ handle_cast({reward_found, {_Rewards, _Coords} = NewTarget}, State) ->
     {noreply, State#state{msg_queue = NewMsgQueue}};
 
 handle_cast({no_rewards, Coords}, State)->
-    ok.
-
-
+    ok;
 handle_cast(noop, State) ->
     {noreply, State}.
 
@@ -140,12 +138,6 @@ terminate(Reason, _State) ->
     ok.
 
 %%% HELPERS %%%
-
-inform_explorers(Msg, Coords, RewardsNo, Neighbours) ->
-    lists:foreach(fun(Neighbour) ->
-                     gen_server:cast(Neighbour, {Msg, {RewardsNo, Coords}})
-                  end,
-                  Neighbours).
 
 % TODO Map instead of tuple list for direction
 next_cell_state(NextDirection) ->
@@ -225,29 +217,7 @@ exploring(State) ->
             {{error, Msg}, State}
     end.
 
-earn_reward(Coords) ->
-    Mode = application:get_env(process_war, collection_mode, earn_single_reward),
-    {Points, Rewards} =
-        case Mode of
-            earn_single_reward ->
-                earn_single_reward(Coords);
-            _ ->
-                {earn_multiple_rewards(Coords, 0), 0}
-        end,
-    Points.
 
-earn_single_reward(Coords) ->
-    {ok, Point} = gen_server:call(gs_war_map, {earn_reward, Coords}),
-    Point.
-
-earn_multiple_rewards(Coords, Acc) ->
-    MapResp = gen_server:call(gs_war_map, {earn_reward, Coords}),
-    case MapResp of
-        {ok, 0} ->
-            Acc;
-        {ok, Point} ->
-            earn_multiple_rewards(Coords, Acc + Point)
-    end.
 
 update_state(State, Direction, _CellState, {X, Y}) ->
     % TODO  Pick reward and add point only if the reward is available

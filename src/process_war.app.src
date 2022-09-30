@@ -7,7 +7,8 @@
    [kernel,
     stdlib
    ]},
-  {env,[{collection_mode, earn_single_reward}]},
+  {env,[{collection_mode, single_reward},
+        {visible_rewards_no, true}]},
   {modules, []},
 
   {licenses, ["Apache-2.0"]},
