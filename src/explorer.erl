@@ -123,6 +123,11 @@ handle_cast({reward_found, {_Rewards, _Coords} = NewTarget}, State) ->
     %% TODO update the number of rewards in case the cell is already in the queue
     %% TODO Maybe use genserver call to start targeting a new spot
     {noreply, State#state{msg_queue = NewMsgQueue}};
+
+handle_cast({no_rewards, Coords}, State)->
+    ok.
+
+
 handle_cast(noop, State) ->
     {noreply, State}.
 
@@ -136,9 +141,9 @@ terminate(Reason, _State) ->
 
 %%% HELPERS %%%
 
-inform_explorers(Coords, RewardsNo, Neighbours) ->
+inform_explorers(Msg, Coords, RewardsNo, Neighbours) ->
     lists:foreach(fun(Neighbour) ->
-                     gen_server:cast(Neighbour, {reward_found, {RewardsNo, Coords}})
+                     gen_server:cast(Neighbour, {Msg, {RewardsNo, Coords}})
                   end,
                   Neighbours).
 
@@ -222,12 +227,12 @@ exploring(State) ->
 
 earn_reward(Coords) ->
     Mode = application:get_env(process_war, collection_mode, earn_single_reward),
-    Points =
+    {Points, Rewards} =
         case Mode of
             earn_single_reward ->
                 earn_single_reward(Coords);
             _ ->
-                earn_multiple_rewards(Coords, 0)
+                {earn_multiple_rewards(Coords, 0), 0}
         end,
     Points.
 
