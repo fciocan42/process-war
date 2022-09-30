@@ -10,15 +10,15 @@
 
 -type status() :: ready | exploring | paused | targeting.
 
--record(state, {
-    current_position :: coord,
-    current_move :: atom(),
-    previous_move :: atom(),
-    points :: integer(),
-    status :: status(),
-    name :: atom(),
-    msg_queue :: list({integer(), coord})
-}).
+-record(state,
+        {current_position :: coord,
+         current_move :: atom(),
+         previous_move :: atom(),
+         points :: integer(),
+         status :: status(),
+         name :: atom(),
+         msg_queue :: [{integer(), coord}],
+         neighbours :: [term()]}).
 
 start_link(Name) ->
     gen_server:start_link({local, Name}, ?MODULE, [Name], []).
@@ -28,77 +28,79 @@ init([Name]) ->
 init([Name, {X, Y}]) ->
     case gs_war_map:add_pid(X, Y) of
         {ok, _} ->
-            {ok, #state{
-                current_position = #coord{x = X, y = Y},
-                current_move = none,
-                previous_move = none,
-                points = 0,
-                status = ready,
-                name = Name
-            }};
+            {ok,
+             #state{current_position = #coord{x = X, y = Y},
+                    current_move = none,
+                    previous_move = none,
+                    points = 0,
+                    status = ready,
+                    name = Name}};
         {error, Msg} ->
-            {stop,  Msg}
+            {stop, Msg}
     end.
 
-start(Name)->
+start(Name) ->
     case gen_server:call(Name, exploring) of
-        {ok, exploring} -> start(Name);
-        {ok, targeting} -> targeting(Name);
-        {ok, paused} -> paused
+        {ok, exploring} ->
+            start(Name);
+        {ok, targeting} ->
+            targeting(Name);
+        {ok, paused} ->
+            paused
     end.
 
-pause(Name)->
+pause(Name) ->
     gen_server:call(Name, pause).
 
-ready(Name)->
+ready(Name) ->
     gen_server:call(Name, ready).
 
-targeting(Name)->
+targeting(Name) ->
     gen_server:call(Name, targeting).
 
-get_neighbours()->
+get_neighbours() ->
     {ok, Neighbours} = gen_server:call(gs_war_map, neighbours),
     Neighbours.
 
 stop() ->
     gen_server:stop(?MODULE).
 
-
 %%% CALLBACKS %%%
 
 handle_call(pause, _From, State) ->
     NewState = State#state{status = paused},
     {reply, {ok, NewState}, NewState};
-
 handle_call(ready, _From, State) ->
     NewState = State#state{status = ready},
     {reply, {ok, NewState}, NewState};
-
 handle_call(exploring, _From, State = #state{status = ready}) ->
     {reply, {ok, exploring}, State#state{status = exploring}};
-
-handle_call(exploring, _From, State = #state{status=paused}) ->
+handle_call(exploring, _From, State = #state{status = paused}) ->
     {reply, {ok, paused}, State};
-
 handle_call(exploring, _From, State = #state{status = exploring}) ->
-    {Reply, ReplyState} = case exploring(State) of
-        % TODO earn or inform about reward depending on game mode
-        {ok, NewState, reward} ->
-
-            earn_reward(Coords),
-            inform_explorers(Coords),
-            {{ok, exploring}, NewState};
-        {ok, NewState, _} ->  {{ok, exploring}, NewState};
-        {error, _Msg} -> {{ok, paused}, State#state{status = paused}}
-    end,
+    {Reply, ReplyState} =
+        case exploring(State) of
+            % TODO earn or inform about reward depending on game mode
+            {ok, NewState, reward} ->
+                Coords = NewState#state.current_position,
+                Points = earn_reward(Coords),
+                inform_explorers(Coords, 1, State#state.neighbours),
+                CurrentPoints = NewState#state.points,
+                {{ok, exploring}, NewState#state{points = CurrentPoints + Points}};
+            {ok, NewState, _} ->
+                {{ok, exploring}, NewState};
+            {error, _Msg} ->
+                {{ok, paused}, State#state{status = paused}}
+        end,
     {reply, Reply, ReplyState};
-
 handle_call(exploring, _From, State = #state{status = targeting}) ->
     {reply, {ok, targeting}, State};
-
-handle_call(targeting, _From, State = #state{ status = exploring,
-                                              msg_queue = MsgQueue,
-                                              current_position = CurrentPosition}) ->
+handle_call(targeting,
+            _From,
+            State =
+                #state{status = exploring,
+                       msg_queue = MsgQueue,
+                       current_position = CurrentPosition}) ->
     % TODO update queue with rewards coord
     {Rewards, BestX, BestY} = find_the_best_target(CurrentPosition, MsgQueue),
     NewState = State#state{status = targeting},
@@ -125,21 +127,26 @@ handle_cast(noop, State) ->
     {noreply, State}.
 
 handle_info(Msg, State) ->
-    io:format("Unexpected message: ~p~n",[Msg]),
+    io:format("Unexpected message: ~p~n", [Msg]),
     {noreply, State}.
 
- terminate(Reason, _State) ->
-    io:format("Goodbye, brave warriors!~p~n",[Reason]),
+terminate(Reason, _State) ->
+    io:format("Goodbye, brave warriors!~p~n", [Reason]),
     ok.
 
-
 %%% HELPERS %%%
+
+inform_explorers(Coords, RewardsNo, Neighbours) ->
+    lists:foreach(fun(Neighbour) ->
+                     gen_server:cast(Neighbour, {reward_found, {RewardsNo, Coords}})
+                  end,
+                  Neighbours).
+
 % TODO Map instead of tuple list for direction
 next_cell_state(NextDirection) ->
     [NextCellState] =
-        lists:filter(
-            fun({Direction, _CellState, _Coords}) -> Direction == NextDirection end, gs_war_map:available_steps()
-        ),
+        lists:filter(fun({Direction, _CellState, _Coords}) -> Direction == NextDirection end,
+                     gs_war_map:available_steps()),
     NextCellState.
 
 targeting(X, Y, State) ->
@@ -176,7 +183,6 @@ targeting_horizontal(X, StateX, State) when StateX > X ->
     end;
 targeting_horizontal(X, StateX, State) ->
     {ok, State}.
-
 
 targeting_vertical(Y, StateY, State) when StateY < Y ->
     {Direction, CellState, Coords} = next_cell_state(down),
@@ -216,12 +222,13 @@ exploring(State) ->
 
 earn_reward(Coords) ->
     Mode = application:get_env(process_war, collection_mode, earn_single_reward),
-    Points = case Mode of
-        earn_single_reward ->
-            earn_single_reward(Coords);
-        _ ->
-            earn_multiple_rewards(Coords, 0)
-    end,
+    Points =
+        case Mode of
+            earn_single_reward ->
+                earn_single_reward(Coords);
+            _ ->
+                earn_multiple_rewards(Coords, 0)
+        end,
     Points.
 
 earn_single_reward(Coords) ->
@@ -237,7 +244,6 @@ earn_multiple_rewards(Coords, Acc) ->
             earn_multiple_rewards(Coords, Acc + Point)
     end.
 
-
 update_state(State, Direction, _CellState, {X, Y}) ->
     % TODO  Pick reward and add point only if the reward is available
     %
@@ -248,61 +254,84 @@ update_state(State, Direction, _CellState, {X, Y}) ->
     % end,
     %
     PrevMove = State#state.current_position,
-    State#state{
-        current_position = #coord{x = X, y = Y},
-        current_move = Direction,
-        previous_move = PrevMove
-    }.
+    State#state{current_position = #coord{x = X, y = Y},
+                current_move = Direction,
+                previous_move = PrevMove}.
 
 available_steps() ->
-    lists:filter(
-        fun({_Direction, CellState, _Coords}) -> CellState =/= out end, gs_war_map:available_steps()
-    ).
+    lists:filter(fun({_Direction, CellState, _Coords}) -> CellState =/= out end,
+                 gs_war_map:available_steps()).
 
-opposite_directions(Dir1,  Dir2) ->
+opposite_directions(Dir1, Dir2) ->
     case Dir1 of
-        right -> Dir2 == left;
-        left -> Dir2 == right;
-        up -> Dir2 == down;
-        down  -> Dir2 == up
+        right ->
+            Dir2 == left;
+        left ->
+            Dir2 == right;
+        up ->
+            Dir2 == down;
+        down ->
+            Dir2 == up
     end.
 
-compute_next_move(State)->
+compute_next_move(State) ->
     %
     Steps = available_steps(),
     % 1st priority: Go on rewards
-    case lists:filter(fun ({_Direction, CellState, _Coords}) -> CellState == reward end, Steps) of
+    case lists:filter(fun({_Direction, CellState, _Coords}) -> CellState == reward end, Steps)
+    of
         [] ->
             % 2nd priority: Go in the same direction
-            case lists:filter(fun ({Direction, _CellState, _Coords}) -> Direction == State#state.current_position end, Steps) of
+            case lists:filter(fun({Direction, _CellState, _Coords}) ->
+                                 Direction == State#state.current_position
+                              end,
+                              Steps)
+            of
                 [] ->
                     % 3rd priority: Don’t go backwards
-                    case lists:filter(fun (Direction, _CellState, _Coords) -> opposite_directions(Direction, State#state.current_position) == false end, Steps) of
+                    case lists:filter(fun(Direction, _CellState, _Coords) ->
+                                         opposite_directions(Direction,
+                                                             State#state.current_position)
+                                         == false
+                                      end,
+                                      Steps)
+                    of
                         [] ->
                             % Go backwards when it’s the only option
                             hd(Steps);
                         RandomSteps ->
                             % Last priority: choose random
                             ListSize = lists:length(RandomSteps),
-                            lists:nth(rand:uniform(ListSize), RandomSteps)
+                            lists:nth(
+                                rand:uniform(ListSize), RandomSteps)
                     end;
                 [NextMove] ->
                     NextMove
             end;
         Rewards ->
             % 1.1 Go on a reward wich is in the current direction if it exists
-            case lists:filter(fun ({Direction, _CellState, _Coords}) -> Direction == State#state.current_position end, Rewards) of
+            case lists:filter(fun({Direction, _CellState, _Coords}) ->
+                                 Direction == State#state.current_position
+                              end,
+                              Rewards)
+            of
                 [] ->
-
                     % 1.2 Don’t go backwards for reward
-                    case lists:filter(fun (Direction, _CellState, _Coords) -> opposite_directions(Direction, State#state.current_position) == false end, Rewards) of
+                    case lists:filter(fun(Direction, _CellState, _Coords) ->
+                                         opposite_directions(Direction,
+                                                             State#state.current_position)
+                                         == false
+                                      end,
+                                      Rewards)
+                    of
                         [] ->
                             % Go backwards when it’s the only option
                             hd(Rewards);
                         RandomRewards ->
                             % Last priority: choose random
                             ListSize = lists:length(RandomRewards),
-                            lists:nth(rand:uniform(ListSize), RandomRewards)
+                            lists:nth(
+                                rand:uniform(ListSize), RandomRewards)
                     end;
                 [Reward] ->
                     Reward
@@ -311,11 +340,12 @@ compute_next_move(State)->
 
 find_the_best_target(CurrentPosition, MsgQueue) ->
     lists:sort(fun({R1, Coords1}, {R2, Coords2}) ->
-                    hvalue(R1, CurrentPosition, Coords1) > hvalue(R2, CurrentPosition, Coords2)
-               end, MsgQueue).
+                  hvalue(R1, CurrentPosition, Coords1) > hvalue(R2, CurrentPosition, Coords2)
+               end,
+               MsgQueue).
 
 hvalue(Rewards, CurrentPosition, TargetPostion) ->
     Rewards / compute_distance(CurrentPosition, TargetPostion).
 
 compute_distance({CurrentX, CurrentY}, {TargetX, TargetY}) ->
-   math:sqrt(math:pow((CurrentX - TargetX), 2) + math:pow((CurrentY - TargetY), 2)).
+    math:sqrt(math:pow(CurrentX - TargetX, 2) + math:pow(CurrentY - TargetY, 2)).
