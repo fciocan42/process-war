@@ -16,7 +16,8 @@
     previous_move :: atom(),
     points :: integer(),
     status :: status(),
-    name :: atom()
+    name :: atom(),
+    msg_queue :: list({integer(), coord})
 }).
 
 start_link(Name) ->
@@ -91,22 +92,38 @@ handle_call(exploring, _From, State = #state{status = exploring}) ->
 handle_call(exploring, _From, State = #state{status = targeting}) ->
     {reply, {ok, targeting}, State};
 
-handle_call(targeting, _From, State = #state{status = exploring}) ->
+handle_call(targeting, _From, State = #state{ status = exploring,
+                                              msg_queue = MsgQueue,
+                                              current_position = CurrentPosition}) ->
     % TODO update queue with rewards coord
+    {Rewards, BestX, BestY} = find_the_best_target(CurrentPosition, MsgQueue),
     NewState = State#state{status = targeting},
     {reply, {ok, NewState}, NewState};
 handle_call(targeting, _From, State = #state{status = targeting}) ->
     % TODO get  coords from queue
-    targeting(X, Y, State),
-    {reply, {ok, NewState}, NewState};
+    % targeting(X, Y, State),
+    % {reply, {ok, NewState}, NewState}.
+    {reply, {ok, State}, State}.
 
+%% MaybeTODO
+%% update the other explorers with the number of rewards in the cell after collecting each reward
+
+%% TODO
+%% new handle cast for no more rewards
+%% eliminate the target from msg queue based on the coordinates
+handle_cast({reward_found, {_Rewards, _Coords} = NewTarget}, State) ->
+    CurrentMsgQueue = State#state.msg_queue,
+    NewMsgQueue = [NewTarget | CurrentMsgQueue],
+    %% TODO update the number of rewards in case the cell is already in the queue
+    %% TODO Maybe use genserver call to start targeting a new spot
+    {noreply, State#state{msg_queue = NewMsgQueue}};
 handle_cast(noop, State) ->
     {noreply, State}.
 
 handle_info(Msg, State) ->
     io:format("Unexpected message: ~p~n",[Msg]),
     {noreply, State}.
- 
+
  terminate(Reason, _State) ->
     io:format("Goodbye, brave warriors!~p~n",[Reason]),
     ok.
@@ -195,13 +212,13 @@ exploring(State) ->
 
 update_state(State, Direction, _CellState, {X, Y}) ->
     % TODO  Pick reward and add point only if the reward is available
-    % 
+    %
     % PointsNow = State#state.points,
     % Points = case CellState of
     %     reward -> PointsNow + 1;
     %     _ -> PointsNow
     % end,
-    % 
+    %
     PrevMove = State#state.current_position,
     State#state{
         current_position = #coord{x = X, y = Y},
@@ -223,7 +240,7 @@ opposite_directions(Dir1,  Dir2) ->
     end.
 
 compute_next_move(State)->
-    % 
+    %
     Steps = available_steps(),
     % 1st priority: Go on rewards
     case lists:filter(fun ({_Direction, CellState, _Coords}) -> CellState == reward end, Steps) of
@@ -263,3 +280,14 @@ compute_next_move(State)->
                     Reward
             end
     end.
+
+find_the_best_target(CurrentPosition, MsgQueue) ->
+    lists:sort(fun({R1, Coords1}, {R2, Coords2}) ->
+                    hvalue(R1, CurrentPosition, Coords1) > hvalue(R2, CurrentPosition, Coords2)
+               end, MsgQueue).
+
+hvalue(Rewards, CurrentPosition, TargetPostion) ->
+    Rewards / compute_distance(CurrentPosition, TargetPostion).
+
+compute_distance({CurrentX, CurrentY}, {TargetX, TargetY}) ->
+   math:sqrt(math:pow((CurrentX - TargetX), 2) + math:pow((CurrentY - TargetY), 2)).
