@@ -18,7 +18,8 @@
          status :: status(),
          name :: atom(),
          msg_queue :: [{integer(), coord}],
-         neighbours :: [term()]}).
+         neighbours :: [term()],
+         targeting_mode :: atom()}).
 
 start_link(Name) ->
     gen_server:start_link({local, Name}, ?MODULE, [Name], []).
@@ -34,7 +35,9 @@ init([Name, {X, Y}]) ->
                     previous_move = none,
                     points = 0,
                     status = ready,
-                    name = Name}};
+                    name = Name,
+                    msg_queue = [],
+                    targeting_mode = application:get_env(proces_war, targeting_mode, focus)}};
         {error, Msg} ->
             {stop, Msg}
     end.
@@ -43,8 +46,6 @@ start(Name) ->
     case gen_server:call(Name, exploring) of
         {ok, exploring} ->
             start(Name);
-        {ok, targeting} ->
-            targeting(Name);
         {ok, paused} ->
             paused
     end.
@@ -80,7 +81,6 @@ handle_call(exploring, _From, State = #state{status = paused}) ->
 handle_call(exploring, _From, State = #state{status = exploring}) ->
     {Reply, ReplyState} =
         case exploring(State) of
-            % TODO earn or inform about reward depending on game mode
             {ok, NewState, reward} ->
                 Coords = NewState#state.current_position,
                 Neighbours = NewState#state.neighbours,
@@ -101,7 +101,6 @@ handle_call(targeting,
                 #state{status = exploring,
                        msg_queue = MsgQueue,
                        current_position = CurrentPosition}) ->
-    % TODO update queue with rewards coord
     {Rewards, BestX, BestY} = find_the_best_target(CurrentPosition, MsgQueue),
     NewState = State#state{status = targeting},
     {reply, {ok, NewState}, NewState};
@@ -117,15 +116,22 @@ handle_call(targeting, _From, State = #state{status = targeting}) ->
 %% TODO
 %% new handle cast for no more rewards
 %% eliminate the target from msg queue based on the coordinates
-handle_cast({reward_found, {_Rewards, _Coords} = NewTarget}, State) ->
+handle_cast({reward_found, {Rewards, Coords} = NewTarget}, State) ->
     CurrentMsgQueue = State#state.msg_queue,
-    NewMsgQueue = [NewTarget | CurrentMsgQueue],
-    %% TODO update the number of rewards in case the cell is already in the queue
+    NewMsgQueue =
+        lists:map(fun ({_, QueueCoords}) when QueueCoords == Coords ->
+                          NewTarget;
+                      (Target) ->
+                          Target
+                  end,
+                  CurrentMsgQueue),
     %% TODO Maybe use genserver call to start targeting a new spot
     {noreply, State#state{msg_queue = NewMsgQueue}};
-
-handle_cast({no_rewards, Coords}, State)->
-    ok;
+handle_cast({no_rewards, {Rewards, Coords}}, State) ->
+    CurrentMsgQueue = State#state.msg_queue,
+    NewMsgQueue =
+        lists:filter(fun({_, QueueCoords}) -> Coords =/= QueueCoords end, CurrentMsgQueue),
+    {noreply, State#state{msg_queue = NewMsgQueue}};
 handle_cast(noop, State) ->
     {noreply, State}.
 
@@ -216,8 +222,6 @@ exploring(State) ->
         {error, Msg} ->
             {{error, Msg}, State}
     end.
-
-
 
 update_state(State, Direction, _CellState, {X, Y}) ->
     % TODO  Pick reward and add point only if the reward is available

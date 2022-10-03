@@ -20,7 +20,14 @@ earn_reward_and_inform(Coords, Neighbours) ->
 
 earn_single_reward_and_inform(Coords, Neighbours) ->
     {ok, {Point, RemRewards}} = gen_server:call(gs_war_map, {earn_reward, Coords}),
-    inform_explorers(?REWARD_FOUND, Coords, RemRewards, Neighbours),
+    case {Point, RemRewards} of
+        {0, _} ->
+            inform_explorers(?NO_REWARDS, Coords, RemRewards, Neighbours);
+        {_, 0} ->
+            inform_explorers(?NO_REWARDS, Coords, RemRewards, Neighbours);
+        _ ->
+            inform_explorers(?REWARD_FOUND, Coords, RemRewards, Neighbours)
+    end,
     {Point, RemRewards}.
 
 earn_multiple_rewards_and_inform(Coords, Acc, Neighbours) ->

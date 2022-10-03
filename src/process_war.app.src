@@ -8,7 +8,8 @@
     stdlib
    ]},
   {env,[{collection_mode, single_reward},
-        {visible_rewards_no, true}]},
+        {visible_rewards_no, true},
+        {targeting_mode, focus}]},
   {modules, []},
 
   {licenses, ["Apache-2.0"]},
