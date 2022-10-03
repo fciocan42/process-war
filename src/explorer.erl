@@ -116,12 +116,6 @@ handle_call(targeting, _From, State = #state{status = targeting, targeting_mode 
 handle_call(targeting, _From, State = #state{status = targeting, targeting_mode = focus}) ->
     {reply, {ok, State}, State}.
 
-%% MaybeTODO
-%% update the other explorers with the number of rewards in the cell after collecting each reward
-
-%% TODO
-%% new handle cast for no more rewards
-%% eliminate the target from msg queue based on the coordinates
 handle_cast({reward_found, {Rewards, Coords} = NewTarget}, State) ->
     CurrentMsgQueue = State#state.msg_queue,
     NewMsgQueue =
@@ -135,11 +129,13 @@ handle_cast({reward_found, {Rewards, Coords} = NewTarget}, State) ->
     ServerName = State#state.name,
     targeting(ServerName),
     {noreply, State#state{msg_queue = NewMsgQueue}};
+
 handle_cast({no_rewards, {Rewards, Coords}}, State) ->
     CurrentMsgQueue = State#state.msg_queue,
     NewMsgQueue =
         lists:filter(fun({_, QueueCoords}) -> Coords =/= QueueCoords end, CurrentMsgQueue),
     {noreply, State#state{msg_queue = NewMsgQueue}};
+
 handle_cast(noop, State) ->
     {noreply, State}.
 
@@ -153,12 +149,8 @@ terminate(Reason, _State) ->
 
 %%% HELPERS %%%
 
-% TODO Map instead of tuple list for direction
 next_cell_state(NextDirection) ->
-    [NextCellState] =
-        lists:filter(fun({Direction, _CellState, _Coords}) -> Direction == NextDirection end,
-                     gs_war_map:available_steps()),
-    NextCellState.
+    maps:get(NextDirection, gs_war_map:available_steps()).
 
 targeting(X, Y, State) ->
     StateX = State#state.current_position#coord.x,
@@ -187,7 +179,7 @@ targeting_vertical(_Y, _StateY, State) ->
     {ok, State}.
 
 do_targeting(Direction, Target, State) ->
-    {_Direction, CellState, Coords} = next_cell_state(Direction),
+    {CellState, Coords} = next_cell_state(Direction),
     case gs_war_map:move(Direction) of
         {ok, moved} ->
             NewState0 = update_state(State, Direction, CellState, Coords),
@@ -216,21 +208,13 @@ exploring(State) ->
     end.
 
 update_state(State, Direction, _CellState, {X, Y}) ->
-    % TODO  Pick reward and add point only if the reward is available
-    %
-    % PointsNow = State#state.points,
-    % Points = case CellState of
-    %     reward -> PointsNow + 1;
-    %     _ -> PointsNow
-    % end,
-    %
     PrevMove = State#state.current_position,
     State#state{current_position = #coord{x = X, y = Y},
                 current_move = Direction,
                 previous_move = PrevMove}.
 
 available_steps() ->
-    lists:filter(fun({_Direction, CellState, _Coords}) -> CellState =/= out end,
+    maps:filter(fun(_Direction, {CellState, _Coords}) -> CellState =/= out end,
                  gs_war_map:available_steps()).
 
 opposite_directions(Dir1, Dir2) ->

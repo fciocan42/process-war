@@ -8,14 +8,7 @@
 -export([move/1]).
 -export([available_steps/0]).
 
-% -type coord() :: {integer(), integer()}.
--record(coord, {x :: integer(), y :: integer()}).
-%-record(process, {pid, name, coords :: coord}).
--record(war_map,
-        {dim_n = 10,
-         dim_m = 10,
-         process_map :: #{term() => coord},
-         reward_map = #{#coord{x = 9, y = 9} => 3} :: #{coord => term()}}).
+-include("records.hrl").
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -116,7 +109,7 @@ handle_call(neighbours, From, State) ->
     {Pid, _} = From,
     AllExplorers = State#war_map.process_map,
     Neighbours = maps:without([Pid], AllExplorers),
-    NeighboursPids = maps:keys(Neighbours)
+    NeighboursPids = maps:keys(Neighbours),
     {reply, {ok, NeighboursPids}, State};
 % Move PID
 handle_call({move, Direction}, From, State) ->
@@ -135,12 +128,11 @@ handle_call({move, Direction}, From, State) ->
 handle_call(available_steps, From, State) ->
     Reply = {ok, steps_state(From, State)},
     {reply, Reply, State};
-
 handle_call(reward_alert, From, State) ->
     ok;
-    % get coords of From PID
-    % check if it's not false alert(check if From coords are valid rewards coords)
-    % send reward coords to the rest of PID
+% get coords of From PID
+% check if it's not false alert(check if From coords are valid rewards coords)
+% send reward coords to the rest of PID
 handle_call({earn_reward, {X, Y}}, _From, State) ->
     {Points, RemRewards, ReplyState} =
         case is_reward(X, Y, State) of
@@ -152,12 +144,13 @@ handle_call({earn_reward, {X, Y}}, _From, State) ->
                 {0, 0, State}
         end,
     VisibleRewards = application:get_env(process_war, visible_rewards_no, false),
-    Response = case VisibleRewards of
-        true ->
-            {Points, RemRewards};
-        false ->
-            {Points, ?UNKOWN_REWARDS_NO}
-    end,
+    Response =
+        case VisibleRewards of
+            true ->
+                {Points, RemRewards};
+            false ->
+                {Points, ?UNKOWN_REWARDS_NO}
+        end,
     {reply, {ok, Response}, ReplyState}.
 
 handle_cast(noop, State) ->
@@ -208,9 +201,12 @@ is_reward(X, Y, State) ->
     case lists:search(fun(Reward) -> Reward == #coord{x = X, y = Y} end,
                       maps:keys(State#war_map.reward_map))
     of
-        false -> false;
-        {0, _} -> false;
-        {_, _} -> true
+        false ->
+            false;
+        {0, _} ->
+            false;
+        {_, _} ->
+            true
     end.
 
 steps_state(From, State) ->
@@ -219,18 +215,19 @@ steps_state(From, State) ->
     {Pid, _} = From,
     ProcessMap = State#war_map.process_map,
     Coord = maps:get(Pid, ProcessMap),
-    lists:map(fun({{X, Y}, Direction}) ->
-                 NewX = Coord#coord.x + X,
-                 NewY = Coord#coord.y + Y,
-                 CoordState =
-                     case is_out(NewX, NewY, State) of
-                         true -> out;
-                         false ->
-                             case is_reward(NewX, NewY, State) of
-                                 true -> reward;
-                                 false -> empty
-                             end
-                     end,
-                 {Direction, CoordState, {NewX, NewY}}
-              end,
-              Directions).
+    maps:from_list(
+        lists:map(fun({{X, Y}, Direction}) ->
+                     NewX = Coord#coord.x + X,
+                     NewY = Coord#coord.y + Y,
+                     CoordState =
+                         case is_out(NewX, NewY, State) of
+                             true -> out;
+                             false ->
+                                 case is_reward(NewX, NewY, State) of
+                                     true -> reward;
+                                     false -> empty
+                                 end
+                         end,
+                     {Direction, {CoordState, {NewX, NewY}}}
+                  end,
+                  Directions)).

@@ -3,7 +3,7 @@
         {dim_n = 10,
          dim_m = 10,
          process_map :: #{term() => coord},
-         reward_list = [#coord{x = 9, y = 9}] :: [coord]}).
+         reward_map = [#coord{x = 9, y = 9}] :: [coord]}).
 
 -define(REWARD_FOUND, reward_found).
 -define(NO_REWARDS, no_rewards).
