@@ -112,8 +112,12 @@ handle_call({add_pid, X, Y}, From, State) ->
                 {{error, "Already added!"}, State}
         end,
     {reply, Reply, ReplyState};
-handle_call(neighbours, _From, State) ->
-    {reply, {ok, maps:keys(State#war_map.process_map)}, State};
+handle_call(neighbours, From, State) ->
+    {Pid, _} = From,
+    AllExplorers = State#war_map.process_map,
+    Neighbours = maps:without([Pid], AllExplorers),
+    NeighboursPids = maps:keys(Neighbours)
+    {reply, {ok, NeighboursPids}, State};
 % Move PID
 handle_call({move, Direction}, From, State) ->
     {NewState, Reply} =
