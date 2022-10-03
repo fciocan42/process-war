@@ -1,13 +1,11 @@
 -module(explorer_util).
 
--export([earn_reward_and_inform/2,
-         earn_multiple_rewards_and_inform/3,
-         find_the_best_target/2,
-         inform_explorers/4]).
+-export([earn_reward_and_inform/2, earn_multiple_rewards_and_inform/3,
+         find_the_best_target/2, inform_explorers/4]).
 
 -include("records.hrl").
 
--spec earn_reward_and_inform(coord, list(atom)) -> {integer(), integer()}.
+-spec earn_reward_and_inform(coord, [atom]) -> {integer(), integer()}.
 earn_reward_and_inform(Coords, Neighbours) ->
     Mode = application:get_env(process_war, collection_mode, single_reward),
     {Points, RemRewards} =
@@ -48,21 +46,20 @@ inform_explorers(Msg, Coords, RewardsNo, Neighbours) ->
     do_inform(Msg, Coords, RewardsNo, Neighbours).
 
 do_inform(Msg, Coords, RewardsNo, Neighbours) ->
-    lists:foreach(fun(Neighbour) ->
-        gen_server:cast(Neighbour, {Msg, {RewardsNo, Coords}})
-     end,
-     Neighbours).
+    lists:foreach(fun(Neighbour) -> gen_server:cast(Neighbour, {Msg, {RewardsNo, Coords}})
+                  end,
+                  Neighbours).
 
 find_the_best_target(CurrentPosition, []) ->
-    
+    [];
 find_the_best_target(CurrentPosition, MsgQueue) ->
-        lists:sort(fun({R1, Coords1}, {R2, Coords2}) ->
-                      hvalue(R1, CurrentPosition, Coords1) > hvalue(R2, CurrentPosition, Coords2)
-                   end,
-                   MsgQueue).
+    hd(lists:sort(fun({R1, Coords1}, {R2, Coords2}) ->
+                     hvalue(R1, CurrentPosition, Coords1) > hvalue(R2, CurrentPosition, Coords2)
+                  end,
+                  MsgQueue)).
 
 hvalue(Rewards, CurrentPosition, TargetPostion) ->
-        Rewards / compute_distance(CurrentPosition, TargetPostion).
+    Rewards / compute_distance(CurrentPosition, TargetPostion).
 
 compute_distance({CurrentX, CurrentY}, {TargetX, TargetY}) ->
-        math:sqrt(math:pow(CurrentX - TargetX, 2) + math:pow(CurrentY - TargetY, 2)).
+    math:sqrt(math:pow(CurrentX - TargetX, 2) + math:pow(CurrentY - TargetY, 2)).

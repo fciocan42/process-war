@@ -103,14 +103,14 @@ handle_call(targeting,
                        current_position = CurrentPosition}) ->
     %% TODO take the fist elemnt in queue as it's the only one
     %% (instead of calling find_the_best_target)
-    {_Rewards, BestX, BestY} = explorer_util:find_the_best_target(CurrentPosition, MsgQueue),
+    {_Rewards, {BestX, BestY}} = explorer_util:find_the_best_target(CurrentPosition, MsgQueue),
     NewState = State#state{status = targeting},
     targeting(BestX, BestY, State),
     {reply, {ok, NewState}, NewState};
 handle_call(targeting, _From, State = #state{status = targeting, targeting_mode = dynamic}) ->
     MsgQueue = State#state.msg_queue,
     CurrentPosition = State#state.current_position,
-    {_Rewards, BestX, BestY} = explorer_util:find_the_best_target(CurrentPosition, MsgQueue),
+    {_Rewards, {BestX, BestY}} = explorer_util:find_the_best_target(CurrentPosition, MsgQueue),
     targeting(BestX, BestY, State),
     {reply, {ok, State}, State};
 handle_call(targeting, _From, State = #state{status = targeting, targeting_mode = focus}) ->
@@ -160,6 +160,25 @@ next_cell_state(NextDirection) ->
                      gs_war_map:available_steps()),
     NextCellState.
 
+targeting(Direction, Axis, Target, State) ->
+    {NewDirection, CellState, Coords} = next_cell_state(Direction),
+    case gs_war_map:move(Direction) of
+        {ok, moved} ->
+            NewState0 = update_state(State, NewDirection, CellState, Coords),
+            % TODO check if it s reward to earn and alert
+            {Points, _RemRewards} =
+                case CellState of
+                    reward -> explorer_util:earn_reward_and_inform(Coords, State#state.neighbours);
+                    _ -> {0, 0}
+                end,
+            StatePoints = NewState0#state.points,
+            NewState = NewState0#state{points = StatePoints + Points},
+            % NewStateX = Coords#coord.x,
+            targeting(NewDirection, Axis, Target, NewState);
+        {error, Msg} ->
+            {{error, Msg}, State}
+    end.
+
 targeting(X, Y, State) ->
     StateX = State#state.current_position#coord.x,
     StateY = State#state.current_position#coord.y,
@@ -175,8 +194,15 @@ targeting_horizontal(X, StateX, State) when StateX < X ->
     % move right
     case gs_war_map:move(right) of
         {ok, moved} ->
+            NewState0 = update_state(State, Direction, CellState, Coords),
             % TODO check if it s reward to earn and alert
-            NewState = update_state(State, Direction, CellState, Coords),
+            {Points, _RemRewards} =
+                case CellState of
+                    reward -> explorer_util:earn_reward_and_inform(Coords, State#state.neighbours);
+                    _ -> {0, 0}
+                end,
+            StatePoints = NewState0#state.points,
+            NewState = NewState0#state{points = StatePoints + Points},
             NewStateX = Coords#coord.x,
             targeting_horizontal(X, NewStateX, NewState);
         {error, Msg} ->
