@@ -101,13 +101,19 @@ handle_call(targeting,
                 #state{status = exploring,
                        msg_queue = MsgQueue,
                        current_position = CurrentPosition}) ->
-    {Rewards, BestX, BestY} = find_the_best_target(CurrentPosition, MsgQueue),
+    %% TODO take the fist elemnt in queue as it's the only one
+    %% (instead of calling find_the_best_target)
+    {_Rewards, BestX, BestY} = explorer_util:find_the_best_target(CurrentPosition, MsgQueue),
     NewState = State#state{status = targeting},
+    targeting(BestX, BestY, State),
     {reply, {ok, NewState}, NewState};
-handle_call(targeting, _From, State = #state{status = targeting}) ->
-    % TODO get  coords from queue
-    % targeting(X, Y, State),
-    % {reply, {ok, NewState}, NewState}.
+handle_call(targeting, _From, State = #state{status = targeting, targeting_mode = dynamic}) ->
+    MsgQueue = State#state.msg_queue,
+    CurrentPosition = State#state.current_position,
+    {_Rewards, BestX, BestY} = explorer_util:find_the_best_target(CurrentPosition, MsgQueue),
+    targeting(BestX, BestY, State),
+    {reply, {ok, State}, State};
+handle_call(targeting, _From, State = #state{status = targeting, targeting_mode = focus}) ->
     {reply, {ok, State}, State}.
 
 %% MaybeTODO
@@ -126,6 +132,8 @@ handle_cast({reward_found, {Rewards, Coords} = NewTarget}, State) ->
                   end,
                   CurrentMsgQueue),
     %% TODO Maybe use genserver call to start targeting a new spot
+    ServerName = State#state.name,
+    targeting(ServerName),
     {noreply, State#state{msg_queue = NewMsgQueue}};
 handle_cast({no_rewards, {Rewards, Coords}}, State) ->
     CurrentMsgQueue = State#state.msg_queue,
@@ -159,7 +167,9 @@ targeting(X, Y, State) ->
     {ok, NewStateV} = targeting_vertical(Y, StateY, NewStateH),
     NewStateV.
 
-% TODO Clause when it arrives on reward coords and try to earn points
+%% TODO Clause when it arrives on reward coords and try to earn points
+%% TODO: Make sure that the explorer continues his way to the reward when
+%% he receives a msg and he is in focus mode
 targeting_horizontal(X, StateX, State) when StateX < X ->
     {Direction, CellState, Coords} = next_cell_state(right),
     % move right
@@ -316,15 +326,3 @@ compute_next_move(State) ->
                     Reward
             end
     end.
-
-find_the_best_target(CurrentPosition, MsgQueue) ->
-    lists:sort(fun({R1, Coords1}, {R2, Coords2}) ->
-                  hvalue(R1, CurrentPosition, Coords1) > hvalue(R2, CurrentPosition, Coords2)
-               end,
-               MsgQueue).
-
-hvalue(Rewards, CurrentPosition, TargetPostion) ->
-    Rewards / compute_distance(CurrentPosition, TargetPostion).
-
-compute_distance({CurrentX, CurrentY}, {TargetX, TargetY}) ->
-    math:sqrt(math:pow(CurrentX - TargetX, 2) + math:pow(CurrentY - TargetY, 2)).

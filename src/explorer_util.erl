@@ -2,6 +2,7 @@
 
 -export([earn_reward_and_inform/2,
          earn_multiple_rewards_and_inform/3,
+         find_the_best_target/2,
          inform_explorers/4]).
 
 -include("records.hrl").
@@ -51,3 +52,17 @@ do_inform(Msg, Coords, RewardsNo, Neighbours) ->
         gen_server:cast(Neighbour, {Msg, {RewardsNo, Coords}})
      end,
      Neighbours).
+
+find_the_best_target(CurrentPosition, []) ->
+    
+find_the_best_target(CurrentPosition, MsgQueue) ->
+        lists:sort(fun({R1, Coords1}, {R2, Coords2}) ->
+                      hvalue(R1, CurrentPosition, Coords1) > hvalue(R2, CurrentPosition, Coords2)
+                   end,
+                   MsgQueue).
+
+hvalue(Rewards, CurrentPosition, TargetPostion) ->
+        Rewards / compute_distance(CurrentPosition, TargetPostion).
+
+compute_distance({CurrentX, CurrentY}, {TargetX, TargetY}) ->
+        math:sqrt(math:pow(CurrentX - TargetX, 2) + math:pow(CurrentY - TargetY, 2)).
