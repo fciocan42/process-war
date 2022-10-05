@@ -17,9 +17,11 @@
          points :: integer(),
          status :: status(),
          name :: atom(),
+         new_msg_alert :: boolean(),
          msg_queue :: [{integer(), coord}],
          neighbours :: [term()],
-         targeting_mode :: atom()}).
+         targeting_mode :: atom(),
+         target_position :: coord}).
 
 start_link(Name) ->
     gen_server:start_link({local, Name}, ?MODULE, [Name], []).
@@ -56,8 +58,8 @@ pause(Name) ->
 ready(Name) ->
     gen_server:call(Name, ready).
 
-targeting(Name) ->
-    gen_server:call(Name, targeting).
+targeting(Name, MsgQueue) ->
+    gen_server:call(Name, {targeting, MsgQueue}).
 
 get_neighbours() ->
     {ok, Neighbours} = gen_server:call(gs_war_map, neighbours),
@@ -95,11 +97,10 @@ handle_call(exploring, _From, State = #state{status = exploring}) ->
     {reply, Reply, ReplyState};
 handle_call(exploring, _From, State = #state{status = targeting}) ->
     {reply, {ok, targeting}, State};
-handle_call(targeting,
+handle_call({targeting, MsgQueue},
             _From,
             State =
                 #state{status = exploring,
-                       msg_queue = MsgQueue,
                        current_position = CurrentPosition}) ->
     %% TODO take the fist elemnt in queue as it's the only one
     %% (instead of calling find_the_best_target)
@@ -107,27 +108,21 @@ handle_call(targeting,
     NewState = State#state{status = targeting},
     targeting(BestX, BestY, State),
     {reply, {ok, NewState}, NewState};
-handle_call(targeting, _From, State = #state{status = targeting, targeting_mode = dynamic}) ->
-    MsgQueue = State#state.msg_queue,
+handle_call({targeting, MsgQueue}, _From, State = #state{status = targeting, targeting_mode = dynamic}) ->
     CurrentPosition = State#state.current_position,
     {_Rewards, {BestX, BestY}} = explorer_util:find_the_best_target(CurrentPosition, MsgQueue),
     targeting(BestX, BestY, State),
     {reply, {ok, State}, State};
-handle_call(targeting, _From, State = #state{status = targeting, targeting_mode = focus}) ->
+handle_call({targeting, _MsgQueue}, _From, State = #state{status = targeting, targeting_mode = focus}) ->
     {reply, {ok, State}, State}.
 
-handle_cast({reward_found, {Rewards, Coords} = NewTarget}, State) ->
+handle_cast({reward_found, {_Rewards, _Coords} = NewTarget}, State) ->
+    CurrentTarget = %% get target pos from state
     CurrentMsgQueue = State#state.msg_queue,
-    NewMsgQueue =
-        lists:map(fun ({_, QueueCoords}) when QueueCoords == Coords ->
-                          NewTarget;
-                      (Target) ->
-                          Target
-                  end,
-                  CurrentMsgQueue),
+    NewMsgQueue = explorer_util:update_msg_queue(NewTarget, CurrentMsgQueue),
     %% TODO Maybe use genserver call to start targeting a new spot
     ServerName = State#state.name,
-    targeting(ServerName),
+    targeting(ServerName, NewMsgQueue),
     {noreply, State#state{msg_queue = NewMsgQueue}};
 
 handle_cast({no_rewards, {Rewards, Coords}}, State) ->

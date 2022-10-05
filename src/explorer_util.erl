@@ -1,7 +1,7 @@
 -module(explorer_util).
 
 -export([earn_reward_and_inform/2, earn_multiple_rewards_and_inform/3,
-         find_the_best_target/2, inform_explorers/4]).
+         find_the_best_target/2, inform_explorers/4, update_msg_queue/2]).
 
 -include("records.hrl").
 
@@ -63,3 +63,13 @@ hvalue(Rewards, CurrentPosition, TargetPostion) ->
 
 compute_distance({CurrentX, CurrentY}, {TargetX, TargetY}) ->
     math:sqrt(math:pow(CurrentX - TargetX, 2) + math:pow(CurrentY - TargetY, 2)).
+
+update_msg_queue({Rewards, Coords} = NewTarget, CurrentMsgQueue) ->
+    NewMsgQueue =
+        lists:map(fun ({_, QueueCoords}) when QueueCoords == Coords ->
+                          NewTarget;
+                      (Target) ->
+                          Target
+                  end,
+                  CurrentMsgQueue),
+    NewMsgQueue.
