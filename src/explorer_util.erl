@@ -50,8 +50,10 @@ do_inform(Msg, Coords, RewardsNo, Neighbours) ->
                   end,
                   Neighbours).
 
-find_the_best_target(CurrentPosition, []) ->
+find_the_best_target(_CurrentPosition, []) ->
     [];
+find_the_best_target(_CurrentPosition, [Target]) ->
+    Target;
 find_the_best_target(CurrentPosition, MsgQueue) ->
     hd(lists:sort(fun({R1, Coords1}, {R2, Coords2}) ->
                      hvalue(R1, CurrentPosition, Coords1) > hvalue(R2, CurrentPosition, Coords2)

@@ -45,9 +45,17 @@ init([Name, {X, Y}]) ->
     end.
 
 start(Name) ->
+    gen_server:call(Name, start).
+
+
+loop(Name) ->
     case gen_server:call(Name, exploring) of
         {ok, exploring} ->
-            start(Name);
+            loop(Name);
+        {ok, targeting} ->
+            % TODO handle targeting
+            gen_server:call(Name, targeting),
+            loop(Name);
         {ok, paused} ->
             paused
     end.
@@ -70,14 +78,14 @@ stop() ->
 
 %%% CALLBACKS %%%
 
+handle_call(start, _From, State = #state{status = ready})->
+    {reply, {ok, exploring}, State#state{status = exploring}};
 handle_call(pause, _From, State) ->
     NewState = State#state{status = paused},
     {reply, {ok, NewState}, NewState};
 handle_call(ready, _From, State) ->
     NewState = State#state{status = ready},
     {reply, {ok, NewState}, NewState};
-handle_call(exploring, _From, State = #state{status = ready}) ->
-    {reply, {ok, exploring}, State#state{status = exploring}};
 handle_call(exploring, _From, State = #state{status = paused}) ->
     {reply, {ok, paused}, State};
 handle_call(exploring, _From, State = #state{status = exploring}) ->
@@ -97,31 +105,30 @@ handle_call(exploring, _From, State = #state{status = exploring}) ->
     {reply, Reply, ReplyState};
 handle_call(exploring, _From, State = #state{status = targeting}) ->
     {reply, {ok, targeting}, State};
-handle_call({targeting, MsgQueue},
-            _From,
-            State =
-                #state{status = exploring,
-                       current_position = CurrentPosition}) ->
-    %% TODO take the fist elemnt in queue as it's the only one
-    %% (instead of calling find_the_best_target)
-    {_Rewards, {BestX, BestY}} = explorer_util:find_the_best_target(CurrentPosition, MsgQueue),
+%%% TARGETING HANDLERS %%%
+handle_call(targeting, _From, State = #state{status = exploring}) ->
     NewState = State#state{status = targeting},
-    targeting(BestX, BestY, State),
     {reply, {ok, NewState}, NewState};
-handle_call({targeting, MsgQueue}, _From, State = #state{status = targeting, targeting_mode = dynamic}) ->
-    CurrentPosition = State#state.current_position,
-    {_Rewards, {BestX, BestY}} = explorer_util:find_the_best_target(CurrentPosition, MsgQueue),
-    targeting(BestX, BestY, State),
+handle_call(targeting, _From, State = #state{status = targeting, targeting_mode = dynamic}) ->
+    #state{current_position = CurrentPosition,
+           msg_queue = MsgQueue} = State,
+    {_Rewards, BestCoord} = explorer_util:find_the_best_target(CurrentPosition, MsgQueue),
+    % TODO Handle empty Msg Queue
+    targeting_direction(BestCoord, CurrentPosition, State),
     {reply, {ok, State}, State};
 handle_call({targeting, _MsgQueue}, _From, State = #state{status = targeting, targeting_mode = focus}) ->
-    {reply, {ok, State}, State}.
+        % TODO Handle empty Msg Queue
+
+    {reply, {ok, State}, State};
+handle_call(targeting, _From, State = #state{status = targeting, msg_queue = []}) ->
+    NewState = State#state{status = exploring},
+    {reply, {ok, NewState}, NewState}.
+
+
 
 handle_cast({reward_found, {_Rewards, _Coords} = NewTarget}, State) ->
     CurrentMsgQueue = State#state.msg_queue,
     NewMsgQueue = explorer_util:update_msg_queue(NewTarget, CurrentMsgQueue),
-    %% TODO Maybe use genserver call to start targeting a new spot
-    ServerName = State#state.name,
-    targeting(ServerName, NewMsgQueue),
     {noreply, State#state{msg_queue = NewMsgQueue}};
 
 handle_cast({no_rewards, {Rewards, Coords}}, State) ->
@@ -149,30 +156,32 @@ next_cell_state(NextDirection) ->
 targeting(X, Y, State) ->
     StateX = State#state.current_position#coord.x,
     StateY = State#state.current_position#coord.y,
-    {ok, NewStateH} = targeting_horizontal(X, StateX, State),
-    {ok, NewStateV} = targeting_vertical(Y, StateY, NewStateH),
+    {ok, NewState0} = focus_targeting({X, Y}, {StateX, StateY}, State),
 
-    Coords = NewStateV#state.current_position,
-    Neighbours = NewStateV#state.neighbours,
+    Coords = NewState0#state.current_position,
+    Neighbours = NewState0#state.neighbours,
     {Points, _RemRewards} = explorer_util:earn_reward_and_inform(Coords, Neighbours),
-    NewState = update_points_in_state(Points, NewStateV),
+    NewState = update_points_in_state(Points, NewState0),
     NewState.
 
-targeting_horizontal(X, StateX, State) when StateX < X ->
-    do_targeting(right, X, State);
-targeting_horizontal(X, StateX, State) when StateX > X ->
-    do_targeting(left, X, State);
-targeting_horizontal(_X, _StateX, State) ->
+focus_targeting({X, Y}, {X, Y}, State)->
+    {ok, State};
+focus_targeting(RewardCoord, StateCoord, State) ->
+    {ok, NewState} = targeting_direction(RewardCoord, StateCoord, State),
+    focus_targeting(RewardCoord, StateCoord, NewState).
+
+targeting_direction({X, _Y}, {StateX, _StateY}, State) when StateX < X ->
+    do_targeting(right, State);
+targeting_direction({X, _Y}, {StateX, _StateY}, State) when StateX > X ->
+    do_targeting(left, State);
+targeting_direction({_X, Y}, {_StateX, StateY}, State) when StateY < Y ->
+    do_targeting(down, State);
+targeting_direction({_X, Y}, {_StateX, StateY}, State) when StateY > Y ->
+    do_targeting(up, State);
+targeting_direction(_, _, State) ->
     {ok, State}.
 
-targeting_vertical(Y, StateY, State) when StateY < Y ->
-    do_targeting(down, Y, State);
-targeting_vertical(Y, StateY, State) when StateY > Y ->
-    do_targeting(up, Y, State);
-targeting_vertical(_Y, _StateY, State) ->
-    {ok, State}.
-
-do_targeting(Direction, Target, State) ->
+do_targeting(Direction, State) ->
     {CellState, Coords} = next_cell_state(Direction),
     case gs_war_map:move(Direction) of
         {ok, moved} ->
@@ -183,7 +192,7 @@ do_targeting(Direction, Target, State) ->
                     _ -> {0, 0}
                 end,
             NewState = update_points_in_state(Points, NewState0),
-            do_targeting(Direction, Target, NewState);
+            NewState;
         {error, Msg} ->
             {{error, Msg}, State}
     end.
