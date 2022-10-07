@@ -117,7 +117,6 @@ handle_call({targeting, _MsgQueue}, _From, State = #state{status = targeting, ta
     {reply, {ok, State}, State}.
 
 handle_cast({reward_found, {_Rewards, _Coords} = NewTarget}, State) ->
-    CurrentTarget = %% get target pos from state
     CurrentMsgQueue = State#state.msg_queue,
     NewMsgQueue = explorer_util:update_msg_queue(NewTarget, CurrentMsgQueue),
     %% TODO Maybe use genserver call to start targeting a new spot
@@ -184,7 +183,7 @@ do_targeting(Direction, Target, State) ->
                     _ -> {0, 0}
                 end,
             NewState = update_points_in_state(Points, NewState0),
-            targeting(Direction, Target, NewState);
+            do_targeting(Direction, Target, NewState);
         {error, Msg} ->
             {{error, Msg}, State}
     end.
